@@ -49,6 +49,7 @@ async function handleRedirectAfterLogin() {
     points = getInteger(profile, VCARD.note) || 0;
     document.getElementById("points").innerText = points;
 
+    document.getElementById("loginButton").setAttribute("disabled", "disabled");
     document.getElementById("saveButton").removeAttribute("disabled");
   }
 }
