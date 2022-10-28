@@ -1,17 +1,18 @@
 <!DOCTYPE html>
- <html>
+ <html lang="en">
    <head>
      <meta charset="utf-8" />
-     <title>Getting Started: Inrupt JavaScript Client Libraries</title>
+     <title>Solid Platform</title>
      <script defer src="./build/index.js"></script>
      <link rel="stylesheet" href="my-demo.css" />
    </head>
 
    <body>
      <header>
-       <h2>Getting Started</h2>
-       <h3>with Inrupt JavaScript Client Libraries</h3>
+       <h1>Solid Platforms for Fluent Workers</h1>
+       <h2>Example workflow</h2>
      </header>
+
      <section id="login" class="panel">
        <div class="row">
          <label id="labelLogin" for="btnLogin"
@@ -48,34 +49,85 @@
        </dl>
      </div>
 
-     <div id="read" class="panel">
-       <div class="row">
-         <form id="readForm">
-           <label id="readlabel" for="webID"
-             >3. Read back name (anyone's!) from their WebID:
-           </label>
-           <input
-             type="url"
-             id="webID"
-             name="webID"
-             size="50"
-             placeholder="...not logged in yet - but enter any WebID to read from its profile..."
-           />
-           <button type="submit" name="btnRead" id="btnRead">
-             Read Profile
-           </button>
-         </form>
-       </div>
-       <dl class="display">
-         <dt>Formatted Name (FN) read from Pod:&nbsp</dt>
-         <dd id="labelFN">...not read yet...</dd>
-       </dl>
-     </div>
+     <section class="panel">
+      <p>Welcome to the project demo site. We will walk through a few hypothetical examples involving 3 drivers: Alice, Bob, and Eve, who work with a platform called Solidrive.</p>
+      <img src="alice.svg" alt="Alice" />
+      <img src="bob.svg" alt="Bob" />
+      <img src="eve.svg" alt="Eve" />
+      <img src="solidrive.png" alt="Solidrive logo" />
+      <p>Solidrive is a new kind of platform for gig drivers, that focuses on a privacy-first approach in its business.</p>
+      <p>Step through the workflow below by following the instructions and clicking 'Next' after each step to see how it works.</p>
+     </section>
 
-     <div class="panel">
-      <div class="row">
-        <a href="clicker.html">To Pizza Clicker!</a>
+     <section id="smartwizard" class="panel">
+      <ul class="nav">
+          <li class="nav-item">
+            <a class="nav-link" href="#step-1">
+              <div class="num">1</div>
+              Reset
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#step-2">
+              <span class="num">2</span>
+              Login
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#step-3">
+              <span class="num">3</span>
+              Step Title
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link " href="#step-4">
+              <span class="num">4</span>
+              Step Title
+            </a>
+          </li>
+      </ul>
+   
+      <div class="tab-content">
+          <div id="step-1" class="tab-pane" role="tabpanel" aria-labelledby="step-1">
+              <p>For the demo to be consistent across runs, we need to begin by resetting the workers' pods to initial state.</p>
+              <p>The button below makes each of the drivers log in and delete their Solidriver records and revoke all permissions in turn.</p>
+              
+              <button id="reset-button">Delete driver records</button>
+              <p>Output:</p>
+              <textarea id="step-1-output" cols="90" readonly></textarea>
+          </div>
+          <div id="step-2" class="tab-pane" role="tabpanel" aria-labelledby="step-2">
+              <p>A completely new user would begin by signing up for a data pod. For brevity of the demo, Alice, Bob, and Eve already have pre-registered pods at <span id="solid-identity-provider">...provided by the JavaScript code...</span>, although these could be anywhere they like.</p>
+              <p>Choose a character and note down their login details. Then, use these details to login to their pod provider and gain access to their personal pod.</p>
+              
+              <select class="image-picker show-labels">
+                <option data-img-src="alice.svg" data-img-alt="Alice" value="Alice">Alice</option>
+                <option data-img-src="bob.svg" data-img-alt="Bob" value="Bob">Bob</option>
+                <option data-img-src="eve.svg" data-img-alt="Eve" value="Eve">Eve</option>
+              </select>
+              <textarea id="login-details" rows="3" cols="70" readonly></textarea>
+              <br>
+
+              <button id="login-button">Login</button>
+              <p>Output:</p>
+              <textarea id="step-2-output" cols="90" readonly></textarea>
+          </div>
+          <div id="step-3" class="tab-pane" role="tabpanel" aria-labelledby="step-3">
+              <p>Sign up for Solidrive (we'll skip the ID and other checks and formal employment processes for this demo). To complete sign up, Solidrive ask that you give them append-only access to a collection in your pod, so that they can add records as you work.</p>
+              <p>Default permissions depend on the pod provider. In this demo case (with default Community Solid Server configuration), the default permissions allow anyone to read new resources or write to them.</p>
+              <p>Let's create a new container in the pod where Solidrive data will be stored, remove all access to this container for the public, and grant append-only access to the Solidrive company.</p>
+
+              <button id="create-container-button">Create Solidrive collection</button>
+              <button id="limit-access-button">Limit access to public</button>
+              <button id="grant-access-button">Grant append access to Solidrive</button>
+              <p>Output:</p>
+              <textarea id="step-3-output" cols="90" readonly></textarea>
+          </div>
+          <div id="step-4" class="tab-pane" role="tabpanel" aria-labelledby="step-4">
+              Step content
+          </div>
       </div>
-     </div>
+    </section>
+
    </body>
  </html>

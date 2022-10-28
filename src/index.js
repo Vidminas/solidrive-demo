@@ -5,6 +5,8 @@ import {
   getStringNoLocale,
   setStringNoLocale,
   saveSolidDatasetAt,
+  universalAccess,
+  createContainerAt,
 } from "@inrupt/solid-client";
 import {
   login,
@@ -13,42 +15,42 @@ import {
   fetch,
 } from "@inrupt/solid-client-authn-browser";
 import { VCARD } from "@inrupt/vocab-common-rdf";
+import "smartwizard/dist/css/smart_wizard_arrows.css";
+import smartWizard from 'smartwizard';
+import "image-picker/image-picker/image-picker.css";
+import imagepicker from 'image-picker';
 
-// If your Pod is *not* on `solidcommunity.net`, change this to your identity provider.
-const SOLID_IDENTITY_PROVIDER = "https://solidpod.azurewebsites.net";
-document.getElementById(
-  "solid_identity_provider"
-).innerHTML = `[<a target="_blank" href="${SOLID_IDENTITY_PROVIDER}">${SOLID_IDENTITY_PROVIDER}</a>]`;
+import { SOLID_IDENTITY_PROVIDER, LOGIN_DETAILS_ALICE, LOGIN_DETAILS_BOB, LOGIN_DETAILS_EVE } from "./common";
 
 const NOT_ENTERED_WEBID =
   "...not logged in yet - but enter any WebID to read from its profile...";
-
+const REDIRECT_URL = window.location.href;
+const SOLIDRIVE_CONTAINER_URL = "solidrive/";
 const buttonLogin = document.getElementById("btnLogin");
 const writeForm = document.getElementById("writeForm");
 const readForm = document.getElementById("readForm");
+
 
 // 1a. Start Login Process. Call session.login() function.
 async function loginToIDP() {
   await login({
     oidcIssuer: SOLID_IDENTITY_PROVIDER,
-    clientName: "Inrupt tutorial client app",
-    redirectUrl: window.location.href,
+    clientName: "Solidrive app",
+    redirectUrl: REDIRECT_URL,
   });
 }
 
 // 1b. Login Redirect. Call session.handleIncomingRedirect() function.
 // When redirected after login, finish the process by retrieving session information.
 async function handleRedirectAfterLogin() {
-  await handleIncomingRedirect(window.location.href);
+  const sessionInfo = await handleIncomingRedirect(REDIRECT_URL);
 
-  const session = getDefaultSession();
-  if (session.info.isLoggedIn) {
-    // Update the page with the status.
-    document.getElementById(
-      "labelStatus"
-    ).innerHTML = `Your session is logged in with the WebID [<a target="_blank" href="${session.info.webId}">${session.info.webId}</a>].`;
-    document.getElementById("labelStatus").setAttribute("role", "alert");
-    document.getElementById("webID").value = session.info.webId;
+  if (!sessionInfo.isLoggedIn) {
+    $("#step-2-output").text("Not logged in");
+  } else {
+    $("#step-2-output").text(`Logged in with WebID ${sessionInfo.webId}`);
+    $("#webID").val(sessionInfo.webId);
+    $('#smartwizard').smartWizard("goToStep", 1, true);
   }
 }
 
@@ -61,6 +63,7 @@ handleRedirectAfterLogin();
 async function writeProfile() {
   const name = document.getElementById("input_name").value;
 
+  const session = getDefaultSession();
   if (!session.info.isLoggedIn) {
     // You must be authenticated to write.
     document.getElementById(
@@ -163,9 +166,47 @@ async function readProfile() {
   document.getElementById("labelFN").textContent = `[${formattedName}]`;
 }
 
-buttonLogin.onclick = function () {
-  loginToIDP();
-};
+// https://docs.inrupt.com/developer-tools/javascript/client-libraries/reference/glossary/#term-Container
+async function createSolidriveContainer() {
+  const session = getDefaultSession();
+  const outputText = $("#step-3-output").val();
+
+  if (!session.info.isLoggedIn) {
+    $("#step-3-output").text(outputText + "Cannot create Solidrive container - user is not logged in!\n");
+    return;
+  }
+
+  // https://solidpod.azurewebsites.net/Alice-s-Pod/profile/card#me
+  const podURL = session.info.webId.replace("profile/card#me", SOLIDRIVE_CONTAINER_URL);
+
+  try {
+    await createContainerAt(podURL, { fetch: fetch });
+  } catch (error) {
+    $("#step-3-output").text(outputText + "Error creating Solidrive container:\n" + error + "\n");
+    return;
+  }
+
+  $("#step-3-output").text(outputText + `Successfully created Solidrive container at ${podURL}\n`);
+}
+
+async function requestAccessToSolidrive(solidriveCollectionPath, resourceOwner){
+  // // ExamplePrinter sets the requested access (if granted) to expire in 5 minutes.
+  // let accessExpiration = new Date( Date.now() +  5 * 60000 );
+
+  // // Call `issueAccessRequest` to create an access request
+  // //
+  // const requestVC = await issueAccessRequest(
+  //     {
+  //        "access":  { read: true },
+  //        "resources": photosToPrint,   // Array of URLs
+  //        "resourceOwner": resourceOwner,
+  //        "expirationDate": accessExpiration,
+  //        "purpose": [ "https://example.com/purposes#print" ]
+  //     },
+  //     { fetch : session.fetch } // From the requestor's (i.e., ExamplePrinter's) authenticated session
+  // );
+  universalAccess.setPublicAccess()
+}
 
 writeForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -175,4 +216,39 @@ writeForm.addEventListener("submit", (event) => {
 readForm.addEventListener("submit", (event) => {
   event.preventDefault();
   readProfile();
+});
+
+$(function() {
+  $("#solid-identity-provider").html(`[<a target="_blank" href="${SOLID_IDENTITY_PROVIDER}">${SOLID_IDENTITY_PROVIDER}</a>]`);
+
+  $('#smartwizard').smartWizard({
+    theme: 'arrows',
+    transition: {
+      animation: 'slideHorizontal'
+  },
+  });
+
+  $("select").imagepicker({
+    hide_select: true,
+    show_label: true,
+    initialized: function(imagePicker) {
+      $("#login-details").text(LOGIN_DETAILS_ALICE);
+    },
+    changed: function(select, newValues, oldValues, event) {
+      switch (newValues[0]) {
+        case "Alice":
+          $("#login-details").text(LOGIN_DETAILS_ALICE);
+          break;
+        case "Bob":
+          $("#login-details").text(LOGIN_DETAILS_BOB);
+          break;
+        case "Eve":
+          $("#login-details").text(LOGIN_DETAILS_EVE);
+          break;
+      }
+    }
+  });
+
+  $("#login-button").on("click", loginToIDP);
+  $("#create-container-button").on("click", createSolidriveContainer);
 });

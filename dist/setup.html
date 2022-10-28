@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+ <html lang="en">
+   <head>
+     <meta charset="utf-8" />
+     <title>Solid Platform</title>
+     <script defer src="./build/setup.js"></script>
+     <link rel="stylesheet" href="my-demo.css" />
+   </head>
+
+   <body>
+     <header>
+       <h1>Solid Platforms for Fluent Workers</h1>
+       <h2>First-time setup</h2>
+     </header>
+
+     <section class="panel">
+       <p>This part of the demo site is for creating pods and generating access tokens, which may be useful across resets of the server or when switching to another solid pod provider.</p>
+     </section>
+
+     <section class="panel">
+        <p>Here are all the currently registered pods:</p>
+        <ul id="pods"></ul>
+        <p>To register a new pod, go to <span id="solid-identity-provider-register">TO BE FILLED IN BY JS</span></p>
+     </section>
+
+     <section class="panel">
+        <p>For any of the registered users, you can see and manage their access tokens:</p>
+        <form id="token-form">
+            <label>Email: <input type="email" name="email" required /></label>
+            <label>Password: <input type="password" name="password" required /></label>
+            <button value="list-tokens" type="submit">List tokens</button>
+            <div>
+              <select id="tokens" name="tokens" size="5"></select>
+            </div>
+            <div>
+              <button value="generate-token" type="submit">Generate and store new token</button>
+              <button value="delete-token" type="submit">Delete selected token</button>
+            </div>
+        </form>
+
+        <p>Many tokens can be generated, but each token's associated id and secret can only be obtained once.</p>
+        <p>For the sake of this demo, the latest token is stored in the user's pod with public access for easy retrieval (DO NOT TRY THIS AT HOME).</p>
+        <p>Output:</p>
+        <textarea id="token-output" readonly rows="10" cols="100"></textarea>
+     </section>
+   </body>
+ </html>
