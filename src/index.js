@@ -1,254 +1,419 @@
 import {
   getSolidDataset,
-  getThing,
-  setThing,
+  hasFallbackAcl,
+  hasAccessibleAcl,
+  createAclFromFallbackAcl,
   getStringNoLocale,
-  setStringNoLocale,
-  saveSolidDatasetAt,
   universalAccess,
   createContainerAt,
+  getThingAll,
+  saveAclFor,
+  getSolidDatasetWithAcl,
+  createSolidDataset,
+  createThing,
+  setStringNoLocale,
+  setThing,
+  saveSolidDatasetInContainer,
 } from "@inrupt/solid-client";
-import {
-  login,
-  handleIncomingRedirect,
-  getDefaultSession,
-  fetch,
-} from "@inrupt/solid-client-authn-browser";
-import { VCARD } from "@inrupt/vocab-common-rdf";
+import { buildAuthenticatedFetch } from "@inrupt/solid-client-authn-core";
+import { XSD } from "@inrupt/vocab-common-rdf";
 import "smartwizard/dist/css/smart_wizard_arrows.css";
-import smartWizard from 'smartwizard';
+import smartWizard from "smartwizard";
 import "image-picker/image-picker/image-picker.css";
-import imagepicker from 'image-picker';
+import imagepicker from "image-picker";
 
-import { SOLID_IDENTITY_PROVIDER, LOGIN_DETAILS_ALICE, LOGIN_DETAILS_BOB, LOGIN_DETAILS_EVE } from "./common";
+import {
+  SOLID_IDENTITY_PROVIDER,
+  LOGIN_DETAILS_ALICE,
+  LOGIN_DETAILS_BOB,
+  LOGIN_DETAILS_EVE,
+  POD_TOKENS_URL,
+  WEBID_SOLIDRIVE,
+  WEBID_EVE,
+  WEBID_ALICE,
+  WEBID_BOB,
+} from "./constants";
+import { getAccessToken, getWebIdFromToken } from "./css_helpers";
+import { addToTextArea, deleteOrIgnoreContainer } from "./utils";
+import { Session } from "@inrupt/solid-client-authn-node";
+import { generatePassengerReview, generateTripRequest } from "./mock_data";
 
-const NOT_ENTERED_WEBID =
-  "...not logged in yet - but enter any WebID to read from its profile...";
-const REDIRECT_URL = window.location.href;
 const SOLIDRIVE_CONTAINER_URL = "solidrive/";
-const buttonLogin = document.getElementById("btnLogin");
-const writeForm = document.getElementById("writeForm");
-const readForm = document.getElementById("readForm");
 
-
-// 1a. Start Login Process. Call session.login() function.
-async function loginToIDP() {
-  await login({
-    oidcIssuer: SOLID_IDENTITY_PROVIDER,
-    clientName: "Solidrive app",
-    redirectUrl: REDIRECT_URL,
-  });
-}
-
-// 1b. Login Redirect. Call session.handleIncomingRedirect() function.
-// When redirected after login, finish the process by retrieving session information.
-async function handleRedirectAfterLogin() {
-  const sessionInfo = await handleIncomingRedirect(REDIRECT_URL);
-
-  if (!sessionInfo.isLoggedIn) {
-    $("#step-2-output").text("Not logged in");
-  } else {
-    $("#step-2-output").text(`Logged in with WebID ${sessionInfo.webId}`);
-    $("#webID").val(sessionInfo.webId);
-    $('#smartwizard').smartWizard("goToStep", 1, true);
-  }
-}
-
-// The example has the login redirect back to the index.html.
-// This calls the function to process login information.
-// If the function is called when not part of the login redirect, the function is a no-op.
-handleRedirectAfterLogin();
-
-// 2. Write to profile
-async function writeProfile() {
-  const name = document.getElementById("input_name").value;
-
-  const session = getDefaultSession();
-  if (!session.info.isLoggedIn) {
-    // You must be authenticated to write.
-    document.getElementById(
-      "labelWriteStatus"
-    ).textContent = `...you can't write [${name}] until you first login!`;
-    document.getElementById("labelWriteStatus").setAttribute("role", "alert");
-    return;
-  }
-  const webID = session.info.webId;
-  // The WebID can contain a hash fragment (e.g. `#me`) to refer to profile data
-  // in the profile dataset. If we strip the hash, we get the URL of the full
-  // dataset.
-  const profileDocumentUrl = new URL(webID);
-  profileDocumentUrl.hash = "";
-
-  // To write to a profile, you must be authenticated. That is the role of the fetch
-  // parameter in the following call.
-  let myProfileDataset = await getSolidDataset(profileDocumentUrl.href, {
-    fetch: fetch,
-  });
-
-  // The profile data is a "Thing" in the profile dataset.
-  let profile = getThing(myProfileDataset, webID);
-
-  // Using the name provided in text field, update the name in your profile.
-  // VCARD.fn object is a convenience object that includes the identifier string "http://www.w3.org/2006/vcard/ns#fn".
-  // As an alternative, you can pass in the "http://www.w3.org/2006/vcard/ns#fn" string instead of VCARD.fn.
-  profile = setStringNoLocale(profile, VCARD.fn, name);
-
-  // Write back the profile to the dataset.
-  myProfileDataset = setThing(myProfileDataset, profile);
-
-  // Write back the dataset to your Pod.
-  await saveSolidDatasetAt(profileDocumentUrl.href, myProfileDataset, {
-    fetch: session.fetch,
-  });
-
-  // Update the page with the retrieved values.
-  document.getElementById(
-    "labelWriteStatus"
-  ).textContent = `Wrote [${name}] as name successfully!`;
-  document.getElementById("labelWriteStatus").setAttribute("role", "alert");
-  document.getElementById(
-    "labelFN"
-  ).textContent = `...click the 'Read Profile' button to to see what the name might be now...?!`;
-}
-
-// 3. Read profile
-async function readProfile() {
-  const webID = document.getElementById("webID").value;
-
-  if (webID === NOT_ENTERED_WEBID) {
-    document.getElementById(
-      "labelFN"
-    ).textContent = `Login first, or enter a WebID (any WebID!) to read from its profile`;
-    return false;
-  }
+async function getStoredTokens() {
+  const person_token_map = {};
 
   try {
-    new URL(webID);
-  } catch (_) {
-    document.getElementById(
-      "labelFN"
-    ).textContent = `Provided WebID [${webID}] is not a valid URL - please try again`;
-    return false;
-  }
+    const tokenDataset = await getSolidDataset(POD_TOKENS_URL);
+    const tokenThings = getThingAll(tokenDataset);
 
-  const profileDocumentUrl = new URL(webID);
-  profileDocumentUrl.hash = "";
+    for (const tokenThing of tokenThings) {
+      const tokenUrl = new URL(tokenThing.url);
+      const email = decodeURIComponent(tokenUrl.hash.slice(1));
+      const person = email.split("@")[0];
 
-  // Profile is public data; i.e., you do not need to be logged in to read the data.
-  // For illustrative purposes, shows both an authenticated and non-authenticated reads.
-
-  const session = getDefaultSession();
-  let myDataset;
-  try {
-    if (session.info.isLoggedIn) {
-      myDataset = await getSolidDataset(profileDocumentUrl.href, {
-        fetch: fetch,
-      });
-    } else {
-      myDataset = await getSolidDataset(profileDocumentUrl.href);
+      const jsonToken = getStringNoLocale(tokenThing, XSD.string);
+      const token = JSON.parse(jsonToken);
+      person_token_map[person] = token;
     }
-  } catch (error) {
-    document.getElementById(
-      "labelFN"
-    ).textContent = `Entered value [${webID}] does not appear to be a WebID. Error: [${error}]`;
-    return false;
+  } catch (err) {
+    addToTextArea("#step-1-output", `Error retrieving stored tokens: ${err}`);
   }
 
-  const profile = getThing(myDataset, webID);
+  return person_token_map;
+}
 
-  // Get the formatted name (fn) using the property identifier "http://www.w3.org/2006/vcard/ns#fn".
-  // VCARD.fn object is a convenience object that includes the identifier string "http://www.w3.org/2006/vcard/ns#fn".
-  // As an alternative, you can pass in the "http://www.w3.org/2006/vcard/ns#fn" string instead of VCARD.fn.
+async function makeAccessTokens(person_token_map) {
+  const person_auth_map = {};
 
-  const formattedName = getStringNoLocale(profile, VCARD.fn);
+  try {
+    for (const person in person_token_map) {
+      const { id, secret } = person_token_map[person];
 
-  // Update the page with the retrieved values.
-  document.getElementById("labelFN").textContent = `[${formattedName}]`;
+      // This should work instead of the next few lines but:
+      // https://github.com/inrupt/solid-client-authn-js/issues/2429
+      // This approach would refresh access tokens automatically
+      // const session = new Session();
+      // session.login({
+      //   clientId: id,
+      //   clientSecret: secret,
+      //   oidcIssuer: `${SOLID_IDENTITY_PROVIDER}/.well-known/openid-configuration`,
+      // }).then(() => {
+      //   if (session.info.isLoggedIn) {
+      //     person_auth_map[person] = { authFetch: session.fetch, webId: session.info.webId };
+      //   }
+      // });
+      const { dpopKeyPair, accessToken } = await getAccessToken(id, secret);
+      const authFetch = await buildAuthenticatedFetch(fetch, accessToken, {
+        dpopKey: dpopKeyPair,
+      });
+      const webId = await getWebIdFromToken(accessToken);
+      person_auth_map[person] = { authFetch, webId };
+
+      addToTextArea(
+        "#step-1-output",
+        `Successfully got access token for ${person}`
+      );
+    }
+  } catch (err) {
+    addToTextArea("#step-1-output", `Error refreshing access tokens: ${err}`);
+  }
+
+  return person_auth_map;
+}
+
+async function clearSolidriveData(event) {
+  const authMap = event.data.authMap;
+  const person = event.data.selectedPerson;
+  try {
+    const { authFetch, webId } = authMap[person];
+    const solidriveDataUrl = webId.replace(
+      "profile/card#me",
+      SOLIDRIVE_CONTAINER_URL
+    );
+    await deleteOrIgnoreContainer(solidriveDataUrl, authFetch);
+    addToTextArea(
+      "#step-1-output",
+      `Successfully cleared Solidrive data for ${person}`
+    );
+  } catch (err) {
+    addToTextArea(
+      "#step-1-output",
+      `Error clearing Solidrive data for ${person}: ${err}`
+    );
+  }
 }
 
 // https://docs.inrupt.com/developer-tools/javascript/client-libraries/reference/glossary/#term-Container
-async function createSolidriveContainer() {
-  const session = getDefaultSession();
-  const outputText = $("#step-3-output").val();
-
-  if (!session.info.isLoggedIn) {
-    $("#step-3-output").text(outputText + "Cannot create Solidrive container - user is not logged in!\n");
-    return;
-  }
-
-  // https://solidpod.azurewebsites.net/Alice-s-Pod/profile/card#me
-  const podURL = session.info.webId.replace("profile/card#me", SOLIDRIVE_CONTAINER_URL);
+async function createSolidriveContainer(event) {
+  const authMap = event.data.authMap;
+  const person = event.data.selectedPerson;
 
   try {
-    await createContainerAt(podURL, { fetch: fetch });
-  } catch (error) {
-    $("#step-3-output").text(outputText + "Error creating Solidrive container:\n" + error + "\n");
+    const { authFetch, webId } = authMap[person];
+    const solidriveDataUrl = webId.replace(
+      "profile/card#me",
+      SOLIDRIVE_CONTAINER_URL
+    );
+    await createContainerAt(solidriveDataUrl, { fetch: authFetch });
+
+    const containerWithAcl = await getSolidDatasetWithAcl(solidriveDataUrl, {
+      fetch: authFetch,
+    });
+    if (!hasAccessibleAcl(containerWithAcl)) {
+      throw new Error(
+        "The current user does not have permission to change access rights to this Resource."
+      );
+    }
+    if (!hasFallbackAcl(containerWithAcl)) {
+      throw new Error(
+        "The current user does not have permission to see who currently has access to this Resource."
+      );
+    }
+    const containerAcl = createAclFromFallbackAcl(containerWithAcl);
+    await saveAclFor(containerWithAcl, containerAcl, { fetch: authFetch });
+    addToTextArea(
+      "#step-2-output",
+      `Successfully created Solidrive container for ${person}`
+    );
+  } catch (err) {
+    addToTextArea(
+      "#step-2-output",
+      `Error creating Solidrive container for ${person}: ${err}`
+    );
+  }
+}
+
+// https://docs.inrupt.com/developer-tools/javascript/client-libraries/tutorial/manage-access-policies/
+async function checkSolidriveAccess(event) {
+  const authMap = event.data.authMap;
+  const person = event.data.selectedPerson;
+
+  try {
+    const { authFetch, webId } = authMap[person];
+    const solidriveDataUrl = webId.replace(
+      "profile/card#me",
+      SOLIDRIVE_CONTAINER_URL
+    );
+    // Fetch the access explicitly/directly set for the public.
+    // The returned access can be an object { read: <boolean>, append: <boolean>, ... }
+    // or null if the access data is inaccessible to the user.
+    const publicAccess = await universalAccess.getPublicAccess(
+      solidriveDataUrl,
+      { fetch: authFetch }
+    );
+    addToTextArea(
+      "#step-2-output",
+      `Public access: ${JSON.stringify(publicAccess)}`
+    );
+    const agentAccess = await universalAccess.getAgentAccessAll(
+      solidriveDataUrl,
+      { fetch: authFetch }
+    );
+    addToTextArea("#step-2-output", `Agent access:`);
+    for (const agent in agentAccess) {
+      addToTextArea(
+        "#step-2-output",
+        `${agent}: ${JSON.stringify(agentAccess[agent])}`
+      );
+    }
+  } catch (err) {
+    addToTextArea(
+      "#step-2-output",
+      `Error checking access to ${person}'s Solidrive container: ${err}`
+    );
+  }
+}
+
+async function grantSolidriveAccess(event) {
+  const authMap = event.data.authMap;
+  const person = event.data.selectedPerson;
+
+  try {
+    const { authFetch, webId } = authMap[person];
+    const solidriveDataUrl = webId.replace(
+      "profile/card#me",
+      SOLIDRIVE_CONTAINER_URL
+    );
+    await universalAccess.setAgentAccess(
+      solidriveDataUrl,
+      WEBID_SOLIDRIVE,
+      {
+        append: true,
+      },
+      { fetch: authFetch }
+    );
+    addToTextArea(
+      "#step-2-output",
+      `Successfully granted append access to ${person}'s Solidrive container`
+    );
+  } catch (err) {
+    addToTextArea(
+      "#step-2-output",
+      `Error granting append access to ${person}'s Solidrive container: ${err}`
+    );
+  }
+}
+
+async function revokeSolidriveAccess(event) {
+  const authMap = event.data.authMap;
+  const person = event.data.selectedPerson;
+
+  try {
+    const { authFetch, webId } = authMap[person];
+    const solidriveDataUrl = webId.replace(
+      "profile/card#me",
+      SOLIDRIVE_CONTAINER_URL
+    );
+    await universalAccess.setAgentAccess(
+      solidriveDataUrl,
+      WEBID_SOLIDRIVE,
+      {
+        append: false,
+      },
+      { fetch: authFetch }
+    );
+    addToTextArea(
+      "#step-2-output",
+      `Successfully revoked append access to ${person}'s Solidrive container`
+    );
+  } catch (err) {
+    addToTextArea(
+      "#step-2-output",
+      `Error revoking append access to ${person}'s Solidrive container: ${err}`
+    );
+  }
+}
+
+// Should refactor so these global variables aren't needed, but I'm cutting corners for now
+const activeTripRequests = {};
+const money = {
+  "alice": 0,
+  "bob": 0,
+  "eve": 0,
+};
+const fuelPerKmCost = 2;
+
+function showTripRequest(event) {
+  const person = event.data.selectedPerson;
+  if (activeTripRequests[person]) {
+    addToTextArea("#step-3-output", `${person} already has an oustanding trip request!`);
+    return;
+  }
+  activeTripRequests[person] = generateTripRequest();
+  addToTextArea("#step-3-output", `Trip request for ${person}`);
+  addToTextArea("#step-3-output", JSON.stringify(activeTripRequests[person]));
+  addToTextArea("#step-3-output", "------ Accept or Reject? -------");
+}
+
+async function acceptTripRequest(event) {
+  const person = event.data.selectedPerson;
+  const { webId } = event.data.authMap[person];
+  const { authFetch: solidriveFetch } = event.data.authMap["admin"];
+
+  const tripRequest = activeTripRequests[person];
+  if (!tripRequest) {
+    addToTextArea("#step-3-output", `${person} has no outstanding trip requests!`);
     return;
   }
 
-  $("#step-3-output").text(outputText + `Successfully created Solidrive container at ${podURL}\n`);
+  addToTextArea("#step-3-output", "Accepted trip request");
+
+  money[person] += tripRequest.payment;
+  addToTextArea("#step-3-output", `${person} earned $${tripRequest.payment}. They now have: $${money[person]}`);
+  const fuelCost = tripRequest.distance * fuelPerKmCost;
+  money[person] -= fuelCost;
+  addToTextArea("#step-3-output", `But the trip took them ${tripRequest.distance}km and they had to pay $${fuelCost} for fuel.`);
+  const review = generatePassengerReview();
+  if (review) {
+    addToTextArea("#step-3-output", `The passenger left a review: ${review}`);
+  }
+
+  tripRequest.review = review;
+  activeTripRequests[person] = null;
+
+  try {
+    let dataset = createSolidDataset();
+    let tripThing = createThing({ name: `trip-${tripRequest.id}`});
+    tripThing = setStringNoLocale(
+      tripThing,
+      XSD.string,
+      JSON.stringify(tripRequest)
+    );
+    dataset = setThing(dataset, tripThing);
+
+    const solidriveDataUrl = webId.replace(
+      "profile/card#me",
+      SOLIDRIVE_CONTAINER_URL
+    );
+    await saveSolidDatasetInContainer(solidriveDataUrl, dataset, { fetch: solidriveFetch });
+  } catch (err) {
+    addToTextArea("#step-3-output", `Error saving trip data: ${err}`);
+  }
 }
 
-async function requestAccessToSolidrive(solidriveCollectionPath, resourceOwner){
-  // // ExamplePrinter sets the requested access (if granted) to expire in 5 minutes.
-  // let accessExpiration = new Date( Date.now() +  5 * 60000 );
-
-  // // Call `issueAccessRequest` to create an access request
-  // //
-  // const requestVC = await issueAccessRequest(
-  //     {
-  //        "access":  { read: true },
-  //        "resources": photosToPrint,   // Array of URLs
-  //        "resourceOwner": resourceOwner,
-  //        "expirationDate": accessExpiration,
-  //        "purpose": [ "https://example.com/purposes#print" ]
-  //     },
-  //     { fetch : session.fetch } // From the requestor's (i.e., ExamplePrinter's) authenticated session
-  // );
-  universalAccess.setPublicAccess()
+function rejectTripRequest(event) {
+  const person = event.data.selectedPerson;
+  if (!activeTripRequests[person]) {
+    addToTextArea("#step-3-output", `${person} has no outstanding trip requests!`);
+    return;
+  }
+  activeTripRequests[person] = null;
+  addToTextArea("#step-3-output", "Rejected trip request");
 }
 
-writeForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  writeProfile();
-});
+$(async function () {
+  $("#solid-identity-provider").html(
+    `[<a target="_blank" href="${SOLID_IDENTITY_PROVIDER}">${SOLID_IDENTITY_PROVIDER}</a>]`
+  );
 
-readForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  readProfile();
-});
-
-$(function() {
-  $("#solid-identity-provider").html(`[<a target="_blank" href="${SOLID_IDENTITY_PROVIDER}">${SOLID_IDENTITY_PROVIDER}</a>]`);
-
-  $('#smartwizard').smartWizard({
-    theme: 'arrows',
+  $("#smartwizard").smartWizard({
+    theme: "arrows",
     transition: {
-      animation: 'slideHorizontal'
-  },
+      animation: "slideHorizontal",
+    },
   });
 
-  $("select").imagepicker({
+  let selectedPerson;
+
+  const imagePicker = $("select").imagepicker({
     hide_select: true,
     show_label: true,
-    initialized: function(imagePicker) {
+    initialized: function (imagePicker) {
       $("#login-details").text(LOGIN_DETAILS_ALICE);
+      $("#driver-webid").html(`<a href="${WEBID_ALICE}">${WEBID_ALICE}</a>`);
+      selectedPerson = "alice";
     },
-    changed: function(select, newValues, oldValues, event) {
+    changed: function (select, newValues, oldValues, event) {
       switch (newValues[0]) {
-        case "Alice":
+        case "alice":
           $("#login-details").text(LOGIN_DETAILS_ALICE);
+          $("#driver-webid").html(`<a href="${WEBID_ALICE}">${WEBID_ALICE}</a>`);
+          selectedPerson = "alice";
           break;
-        case "Bob":
+        case "bob":
           $("#login-details").text(LOGIN_DETAILS_BOB);
+          $("#driver-webid").html(`<a href="${WEBID_BOB}">${WEBID_BOB}</a>`);
+          selectedPerson = "bob";
           break;
-        case "Eve":
+        case "eve":
           $("#login-details").text(LOGIN_DETAILS_EVE);
+          $("#driver-webid").html(`<a href="${WEBID_EVE}">${WEBID_EVE}</a>`);
+          selectedPerson = "eve";
           break;
       }
-    }
+    },
   });
 
-  $("#login-button").on("click", loginToIDP);
-  $("#create-container-button").on("click", createSolidriveContainer);
+  const tokenMap = await getStoredTokens();
+  const authMap = await makeAccessTokens(tokenMap);
+  $("#reset-button").on(
+    "click",
+    { authMap, selectedPerson },
+    clearSolidriveData
+  );
+  $("#create-container-button").on(
+    "click",
+    { authMap, selectedPerson },
+    createSolidriveContainer
+  );
+  $("#check-access-button").on(
+    "click",
+    { authMap, selectedPerson },
+    checkSolidriveAccess
+  );
+  $("#grant-access-button").on(
+    "click",
+    { authMap, selectedPerson },
+    grantSolidriveAccess
+  );
+  $("#limit-access-button").on(
+    "click",
+    { authMap, selectedPerson },
+    revokeSolidriveAccess
+  );
+
+  $("#wait-trip-request").on("click", { selectedPerson }, showTripRequest);
+  $("#accept-trip-request").on("click", { authMap, selectedPerson }, acceptTripRequest);
+  $("#reject-trip-request").on("click", { selectedPerson }, rejectTripRequest);
 });

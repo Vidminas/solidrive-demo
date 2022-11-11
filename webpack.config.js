@@ -46,6 +46,7 @@ module.exports = {
     }),
   ],
   devServer: {
-    static: "./dist"
+    static: "./dist",
+    allowedHosts: ["solidclient.azurewebsites.net"]
   }
 };

@@ -2,7 +2,7 @@
  <html lang="en">
    <head>
      <meta charset="utf-8" />
-     <title>Solid Platform</title>
+     <title>Solidrive demo</title>
      <script defer src="./build/index.js"></script>
      <link rel="stylesheet" href="my-demo.css" />
    </head>
@@ -13,42 +13,6 @@
        <h2>Example workflow</h2>
      </header>
 
-     <section id="login" class="panel">
-       <div class="row">
-         <label id="labelLogin" for="btnLogin"
-           >1. Click the button to log into
-           <span id="solid_identity_provider"
-             >...provided by the JavaScript code...</span
-           >:
-         </label>
-         <button name="btnLogin" id="btnLogin">Login</button>
-         <p id="labelStatus" class="labelStatus"></p>
-       </div>
-     </section>
-
-     <div id="read" class="panel">
-       <div class="row">
-         <form id="writeForm">
-           <label id="writelabel" for="input_name">2. Write your name: </label>
-           <input
-             type="text"
-             id="input_name"
-             name="name"
-             size="50"
-             placeholder="Your name here"
-           />
-           <button type="submit">
-             Write to Profile
-           </button>
-         </form>
-       </div>
-
-       <dl class="display">
-         <dt>Writing status:&nbsp</dt>
-         <dd id="labelWriteStatus" class="labelStatus">...not written yet...</dd>
-       </dl>
-     </div>
-
      <section class="panel">
       <p>Welcome to the project demo site. We will walk through a few hypothetical examples involving 3 drivers: Alice, Bob, and Eve, who work with a platform called Solidrive.</p>
       <img src="alice.svg" alt="Alice" />
@@ -57,6 +21,19 @@
       <img src="solidrive.png" alt="Solidrive logo" />
       <p>Solidrive is a new kind of platform for gig drivers, that focuses on a privacy-first approach in its business.</p>
       <p>Step through the workflow below by following the instructions and clicking 'Next' after each step to see how it works.</p>
+     </section>
+
+     <section class="panel">
+      <p>A completely new user would begin by signing up for a data pod. For brevity of the demo, Alice, Bob, and Eve already have pre-registered pods at <span id="solid-identity-provider">...provided by the JavaScript code...</span>, although these could be anywhere they like.</p>
+      <p>Choose a character to see their login details. You don't need to remember them, this is here in case you'd like to try manually logging in and exploring their pods.</p>
+      
+      <select class="image-picker show-labels">
+        <!-- Hardcoded assumption: the values here must match the user email usernames used for pods, e.g. alice@localhost or bob@localhost -->
+        <option data-img-src="alice.svg" data-img-alt="alice" value="alice">Alice</option>
+        <option data-img-src="bob.svg" data-img-alt="bob" value="bob">Bob</option>
+        <option data-img-src="eve.svg" data-img-alt="eve" value="eve">Eve</option>
+      </select>
+      <textarea id="login-details" rows="3" cols="30" readonly></textarea>
      </section>
 
      <section id="smartwizard" class="panel">
@@ -70,61 +47,63 @@
           <li class="nav-item">
             <a class="nav-link" href="#step-2">
               <span class="num">2</span>
-              Login
+              Sign up
             </a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="#step-3">
               <span class="num">3</span>
-              Step Title
+              Work
             </a>
           </li>
           <li class="nav-item">
             <a class="nav-link " href="#step-4">
               <span class="num">4</span>
-              Step Title
+              Explore
             </a>
           </li>
       </ul>
    
       <div class="tab-content">
           <div id="step-1" class="tab-pane" role="tabpanel" aria-labelledby="step-1">
+              <p>This workflow assumes initial setup at <a href="/setup.html">/setup.html</a> is already done: all the pods are created and we have OIDC tokens generated for each character.</p>
+              <p>Start by choosing a character above. The currently chosen character will be used for actions in this wizard as you press relevant buttons.</p>
+              <p>The output field at the bottom will indicate what's happening when you press each button.</p>
+
               <p>For the demo to be consistent across runs, we need to begin by resetting the workers' pods to initial state.</p>
-              <p>The button below makes each of the drivers log in and delete their Solidriver records and revoke all permissions in turn.</p>
-              
+              <p>The button below makes your selected character log in, delete their Solidriver records, and reset all permissions.</p>
               <button id="reset-button">Delete driver records</button>
+
               <p>Output:</p>
-              <textarea id="step-1-output" cols="90" readonly></textarea>
+              <textarea id="step-1-output" rows="5" cols="90" readonly></textarea>
           </div>
           <div id="step-2" class="tab-pane" role="tabpanel" aria-labelledby="step-2">
-              <p>A completely new user would begin by signing up for a data pod. For brevity of the demo, Alice, Bob, and Eve already have pre-registered pods at <span id="solid-identity-provider">...provided by the JavaScript code...</span>, although these could be anywhere they like.</p>
-              <p>Choose a character and note down their login details. Then, use these details to login to their pod provider and gain access to their personal pod.</p>
-              
-              <select class="image-picker show-labels">
-                <option data-img-src="alice.svg" data-img-alt="Alice" value="Alice">Alice</option>
-                <option data-img-src="bob.svg" data-img-alt="Bob" value="Bob">Bob</option>
-                <option data-img-src="eve.svg" data-img-alt="Eve" value="Eve">Eve</option>
-              </select>
-              <textarea id="login-details" rows="3" cols="70" readonly></textarea>
-              <br>
-
-              <button id="login-button">Login</button>
-              <p>Output:</p>
-              <textarea id="step-2-output" cols="90" readonly></textarea>
-          </div>
-          <div id="step-3" class="tab-pane" role="tabpanel" aria-labelledby="step-3">
-              <p>Sign up for Solidrive (we'll skip the ID and other checks and formal employment processes for this demo). To complete sign up, Solidrive ask that you give them append-only access to a collection in your pod, so that they can add records as you work.</p>
-              <p>Default permissions depend on the pod provider. In this demo case (with default Community Solid Server configuration), the default permissions allow anyone to read new resources or write to them.</p>
-              <p>Let's create a new container in the pod where Solidrive data will be stored, remove all access to this container for the public, and grant append-only access to the Solidrive company.</p>
+              <p>Now let's sign up for Solidrive (we'll skip the formal employment processes for this demo). To complete sign up, Solidrive ask that you give them append-only access to a collection in your pod, so that they can add records as you work.</p>
+              <p>Let's create a new container in the pod where Solidrive data will be stored. By default, no access rules are created and only the owner can access it.</p>
+              <p>Once you have a new container, grant append-only access to the Solidrive company, so they can add data to it.</p>
+              <p>If you change your mind, you can revoke Solidrive's access at any time.</p>
+              <p>Note that access permissions in Solid are inherited only if there's no ACL defined, once you define one, nothing is inherinted. You can have access to a container but not any of the contents, if they have any permissions set.</p>
 
               <button id="create-container-button">Create Solidrive collection</button>
-              <button id="limit-access-button">Limit access to public</button>
+              <button id="check-access-button">Check access</button>
               <button id="grant-access-button">Grant append access to Solidrive</button>
+              <button id="limit-access-button">Revoke Solidrive access</button>
               <p>Output:</p>
-              <textarea id="step-3-output" cols="90" readonly></textarea>
+              <textarea id="step-2-output" rows="10" cols="90" readonly></textarea>
+          </div>
+          <div id="step-3" class="tab-pane" role="tabpanel" aria-labelledby="step-3">
+              <p>Now let's get started with the daily grind! Press the buttons below to simulate working as a gig driver.</p>
+              
+              <button id="wait-trip-request">Wait for a trip request</button>
+              <button id="accept-trip-request">Accept trip request</button>
+              <button id="reject-trip-request">Reject trip request</button>
+              <p>Output:</p>
+              <textarea id="step-3-output" rows="10" cols="90" readonly></textarea>
           </div>
           <div id="step-4" class="tab-pane" role="tabpanel" aria-labelledby="step-4">
-              Step content
+            <p>Whew! That was long day. After all this driving, we've generated quite a lot of data. What can we do with it?</p>
+            <p>Take a look in your chosen driver's pod to see what's stored in there</p>
+            <p><span id="driver-webid"></span></p>
           </div>
       </div>
     </section>
