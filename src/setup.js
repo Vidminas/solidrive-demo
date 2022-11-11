@@ -3,8 +3,14 @@ import {
   setThing,
   getPodUrlAll,
   setStringNoLocale,
+  getThing,
+  getSolidDataset,
+  getThingAll,
+  getStringNoLocale,
 } from "@inrupt/solid-client";
+import { buildAuthenticatedFetch } from "@inrupt/solid-client-authn-core";
 import { XSD } from "@inrupt/vocab-common-rdf";
+import { generateKeyPair, exportJWK } from "jose";
 import $ from "jquery";
 import {
   EMAIL_SOLIDRIVE,
@@ -25,10 +31,12 @@ import {
   WEBID_EVE,
   POD_TOKENS_URL,
   REGISTER_ENDPOINT,
+  SOLIDRIVE_KEYS_URL,
 } from "./constants";
 import {
   deleteTokenForUser,
   generateTokenForUser,
+  getAccessToken,
   listTokensForUser,
   registerNewUser,
 } from "./css_helpers";
@@ -62,7 +70,7 @@ async function getRegisteredPods() {
 
   for (const [pod, webid, email, password] of pods) {
     // Check if pod exists, no need for full GET, HEAD is enough
-    const res = await fetch(webid, "HEAD");
+    const res = await fetch(webid, { method: "HEAD" });
     const button = $(`<button>Register</button>`);
     button.css("margin-left", "1em");
     button.on("click", { pod, email, password }, registerPod);
@@ -78,7 +86,10 @@ async function getRegisteredPods() {
       li.append(button);
       $("#pods").append(li);
     } else {
-      addToTextArea("#pod-output", `Error fetching ${webid}: [${res.status}] ${res.statusText}`);
+      addToTextArea(
+        "#pod-output",
+        `Error fetching ${webid}: [${res.status}] ${res.statusText}`
+      );
     }
   }
   // This should get related pods if users have them, but not sure if we need this
@@ -187,10 +198,92 @@ async function storeToken(email, id, secret) {
   await saveSolidDatasetAt(POD_TOKENS_URL, tokenDataset);
 }
 
+// This should also be refactored to not require a global variable
+let solidriveAuthFetch = undefined;
+
+async function checkKeychain() {
+  // Lazily get an access token for Solidrive if we don't have one already
+  if (!solidriveAuthFetch) {
+    try {
+      const tokenDataset = await getSolidDataset(POD_TOKENS_URL);
+      const tokenThing = getThing(
+        tokenDataset,
+        `${POD_TOKENS_URL}#${encodeURIComponent(EMAIL_SOLIDRIVE)}`
+      );
+      const jsonToken = getStringNoLocale(tokenThing, XSD.string);
+      const { id, secret } = JSON.parse(jsonToken);
+      const { dpopKeyPair, accessToken } = await getAccessToken(id, secret);
+      solidriveAuthFetch = await buildAuthenticatedFetch(fetch, accessToken, {
+        dpopKey: dpopKeyPair,
+      });
+      addToTextArea(
+        "#keychain-output",
+        `Successfully authenticated as Solidrive`
+      );
+    } catch (err) {
+      addToTextArea(
+        "#keychain-output",
+        `Error authenticating with Solidrive account: ${err}`
+      );
+      return;
+    }
+  }
+
+  try {
+    const keysDataset = await getSolidDataset(SOLIDRIVE_KEYS_URL, { fetch: solidriveAuthFetch });
+    const keysThing = getThingAll(keysDataset)[0];
+    const keys = getStringNoLocale(keysThing, XSD.string);
+    addToTextArea("#keychain-output", `Found Solidrive keys: ${keys}`);
+  } catch (err) {
+    addToTextArea(
+      "#keychain-output",
+      `Error retrieving Solidrive keys: ${err}`
+    );
+  }
+}
+
+// https://jose.readthedocs.io/en/latest/
+async function rotateKeychain() {
+  if (!solidriveAuthFetch) {
+    addToTextArea(
+      "#keychain-output",
+      `Please check keys first to authenticate as Solidrive!`
+    );
+    return;
+  }
+
+  try {
+    const keys = await generateKeyPair("RS512", { extractable: true });
+    const publicKey = await exportJWK(keys.publicKey);
+    const privateKey = await exportJWK(keys.privateKey);
+    let keysDataset = await getOrCreateSolidDataset(SOLIDRIVE_KEYS_URL, solidriveAuthFetch);
+    let keysThing = getOrCreateThing(
+      keysDataset,
+      `${SOLIDRIVE_KEYS_URL}#latest`
+    );
+    keysThing = setStringNoLocale(keysThing, XSD.string, JSON.stringify({ publicKey, privateKey }));
+    keysDataset = setThing(keysDataset, keysThing);
+    await saveSolidDatasetAt(SOLIDRIVE_KEYS_URL, keysDataset, {
+      fetch: solidriveAuthFetch,
+    });
+    addToTextArea(
+      "#keychain-output",
+      `Successfully saved new set of Solidrive keys`
+    );
+  } catch (err) {
+    addToTextArea(
+      "#keychain-output",
+      `Error saving new set of Solidrive keys: ${err}`
+    );
+  }
+}
+
 $(function () {
   $("#solid-identity-provider-register").html(
     `[<a target="_blank" href="${REGISTER_ENDPOINT}">${REGISTER_ENDPOINT}</a>]`
   );
   getRegisteredPods();
   $("#token-form").on("submit", handleForm);
+  $("#check-keychain-button").on("click", checkKeychain);
+  $("#rotate-keychain-button").on("click", rotateKeychain);
 });

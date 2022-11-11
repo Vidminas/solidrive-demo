@@ -14,13 +14,15 @@ import {
   setStringNoLocale,
   setThing,
   saveSolidDatasetInContainer,
+  setDecimal,
 } from "@inrupt/solid-client";
 import { buildAuthenticatedFetch } from "@inrupt/solid-client-authn-core";
-import { XSD } from "@inrupt/vocab-common-rdf";
+import { XSD, DCTERMS, SKOS, CRED } from "@inrupt/vocab-common-rdf";
 import "smartwizard/dist/css/smart_wizard_arrows.css";
 import smartWizard from "smartwizard";
 import "image-picker/image-picker/image-picker.css";
 import imagepicker from "image-picker";
+import { importJWK, SignJWT } from "jose";
 
 import {
   SOLID_IDENTITY_PROVIDER,
@@ -32,6 +34,7 @@ import {
   WEBID_EVE,
   WEBID_ALICE,
   WEBID_BOB,
+  SOLIDRIVE_KEYS_URL,
 } from "./constants";
 import { getAccessToken, getWebIdFromToken } from "./css_helpers";
 import { addToTextArea, deleteOrIgnoreContainer } from "./utils";
@@ -63,9 +66,7 @@ async function getStoredTokens() {
   return person_token_map;
 }
 
-async function makeAccessTokens(person_token_map) {
-  const person_auth_map = {};
-
+async function makeAccessTokens(person_token_map, person_auth_map) {
   try {
     for (const person in person_token_map) {
       const { id, secret } = person_token_map[person];
@@ -98,8 +99,6 @@ async function makeAccessTokens(person_token_map) {
   } catch (err) {
     addToTextArea("#step-1-output", `Error refreshing access tokens: ${err}`);
   }
-
-  return person_auth_map;
 }
 
 async function clearSolidriveData(event) {
@@ -286,6 +285,53 @@ function showTripRequest(event) {
   addToTextArea("#step-3-output", "------ Accept or Reject? -------");
 }
 
+async function getSolidriveSigningKey(solidriveFetch) {
+  const keysDataset = await getSolidDataset(SOLIDRIVE_KEYS_URL, { fetch: solidriveFetch });
+  const keysThing = getThingAll(keysDataset)[0];
+  const keys = getStringNoLocale(keysThing, XSD.string);
+  const { publicKey, privateKey } = JSON.parse(keys);
+  return importJWK(privateKey, "RS512");
+}
+
+async function saveTripData(tripRequest, review, webId, solidriveFetch) {
+  try {
+    let dataset = createSolidDataset();
+    let tripThing = createThing({ name: `trip-${tripRequest.id}`});
+    tripThing = setStringNoLocale(tripThing, DCTERMS.identifier, tripRequest.id);
+    // Could make a vocabulary artifact to get type checking instead of having to have this IRI here
+    // by following https://solidproject.org/developers/vocabularies/code/quickstart
+    // The Financial Business Ontology has a data explorer here: https://spec.edmcouncil.org/fibo/ontology/FND/Accounting/CurrencyAmount/Price
+    tripThing = setDecimal(tripThing, "https://spec.edmcouncil.org/fibo/ontology/FND/Accounting/CurrencyAmount/Price", tripRequest.payment);
+    if (review) {
+      tripThing = setStringNoLocale(tripThing, SKOS.note, review);
+    }
+    tripThing = setDecimal(tripThing, "http://ldf.fi/schema/tour-rdf/distance", tripRequest.distance);
+
+    const solidriveKey = await getSolidriveSigningKey(solidriveFetch);
+    console.log(solidriveKey);
+    const jwe = await new SignJWT({ 
+      iss: WEBID_SOLIDRIVE, //issuer
+      sub: webId, //subject
+      iat: new Date().toISOString(), //issued at time
+    })
+    .setProtectedHeader({
+      alg: "RS512",
+    })
+    .sign(solidriveKey);
+    tripThing = setStringNoLocale(tripThing, CRED.verifiableCredential, jwe);
+    
+    dataset = setThing(dataset, tripThing);
+
+    const solidriveDataUrl = webId.replace(
+      "profile/card#me",
+      SOLIDRIVE_CONTAINER_URL
+    );
+    await saveSolidDatasetInContainer(solidriveDataUrl, dataset, { fetch: solidriveFetch, slugSuggestion: `trip-${tripRequest.id}` });
+  } catch (err) {
+    addToTextArea("#step-3-output", `Error saving trip data: ${err}`);
+  }
+}
+
 async function acceptTripRequest(event) {
   const person = event.data.selectedPerson;
   const { webId } = event.data.authMap[person];
@@ -309,27 +355,8 @@ async function acceptTripRequest(event) {
     addToTextArea("#step-3-output", `The passenger left a review: ${review}`);
   }
 
-  tripRequest.review = review;
   activeTripRequests[person] = null;
-
-  try {
-    let dataset = createSolidDataset();
-    let tripThing = createThing({ name: `trip-${tripRequest.id}`});
-    tripThing = setStringNoLocale(
-      tripThing,
-      XSD.string,
-      JSON.stringify(tripRequest)
-    );
-    dataset = setThing(dataset, tripThing);
-
-    const solidriveDataUrl = webId.replace(
-      "profile/card#me",
-      SOLIDRIVE_CONTAINER_URL
-    );
-    await saveSolidDatasetInContainer(solidriveDataUrl, dataset, { fetch: solidriveFetch });
-  } catch (err) {
-    addToTextArea("#step-3-output", `Error saving trip data: ${err}`);
-  }
+  await saveTripData(tripRequest, review, webId, solidriveFetch);
 }
 
 function rejectTripRequest(event) {
@@ -385,8 +412,11 @@ $(async function () {
     },
   });
 
-  const tokenMap = await getStoredTokens();
-  const authMap = await makeAccessTokens(tokenMap);
+  const authMap = {};
+  $("#auth-button").on("click", async function() {
+    const tokenMap = await getStoredTokens();
+    await makeAccessTokens(tokenMap, authMap);
+  });
   $("#reset-button").on(
     "click",
     { authMap, selectedPerson },

@@ -4,6 +4,7 @@ import {
   createThing,
   createSolidDataset,
   deleteContainer,
+  getThingAll,
 } from "@inrupt/solid-client";
 import $ from "jquery";
 
@@ -12,10 +13,14 @@ export function addToTextArea(textAreaId, text) {
   $(textAreaId).text(oldText + text + "\n");
 }
 
-export async function getOrCreateSolidDataset(datasetUrl) {
+export async function getOrCreateSolidDataset(datasetUrl, authFetch) {
   let dataset;
   try {
-    dataset = await getSolidDataset(datasetUrl);
+    if (authFetch) {
+      dataset = await getSolidDataset(datasetUrl, { fetch: authFetch });
+    } else {
+      dataset = await getSolidDataset(datasetUrl);
+    }
   } catch (err) {
     if (err.response.status === 404) {
       // If the dataset doesn't exist yet, that's okay, just create a new one
@@ -44,5 +49,12 @@ export async function deleteOrIgnoreContainer(containerUrl, authFetch) {
     return;
   }
 
-  await deleteContainer(containerUrl, { fetch: authFetch });
+  // If the container is empty, we can just delete
+  // but if not, we must delete all things contained within first
+  const container = await getSolidDataset(containerUrl, { fetch: authFetch });
+  if (getThingAll(container) === []) {
+    await deleteContainer(containerUrl, { fetch: authFetch });
+  } else {
+    throw new Error("Cannot delete Solidrive container - it is not empty. Recursive delete not implemented yet...");
+  }
 }

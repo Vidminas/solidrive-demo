@@ -14,16 +14,20 @@ export const EMAIL_SOLIDRIVE = "admin@solidrive";
 export const PASSWORD_SOLIDRIVE = "Solidrive";
 export const POD_SOLIDRIVE = "Solidrive Pod";
 export const WEBID_SOLIDRIVE = `${SOLID_IDENTITY_PROVIDER}/Solidrive-Pod/profile/card#me`;
+export const SOLIDRIVE_KEYS_URL = WEBID_SOLIDRIVE.replace("profile/card#me", "keys");
+
 export const EMAIL_ALICE = "alice@localhost";
 export const PASSWORD_ALICE = "Wonderland";
 export const POD_ALICE = "Alice's Pod";
 export const WEBID_ALICE = `${SOLID_IDENTITY_PROVIDER}/Alice-s-Pod/profile/card#me`;
 export const LOGIN_DETAILS_ALICE = `Email: ${EMAIL_ALICE}\nPassword: ${PASSWORD_ALICE}`;
+
 export const EMAIL_BOB = "bob@localhost";
 export const PASSWORD_BOB = "AfraidOfNothing";
 export const POD_BOB = "Bob's Pod";
 export const WEBID_BOB = `${SOLID_IDENTITY_PROVIDER}/Bob-s-Pod/profile/card#me`;
 export const LOGIN_DETAILS_BOB = `Email: ${EMAIL_BOB}\nPassword: ${PASSWORD_BOB}`;
+
 export const EMAIL_EVE = "eve@localhost";
 export const PASSWORD_EVE = "HavingFun";
 export const POD_EVE = "Eve's Pod";

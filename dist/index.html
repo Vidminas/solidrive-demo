@@ -67,7 +67,10 @@
       <div class="tab-content">
           <div id="step-1" class="tab-pane" role="tabpanel" aria-labelledby="step-1">
               <p>This workflow assumes initial setup at <a href="/setup.html">/setup.html</a> is already done: all the pods are created and we have OIDC tokens generated for each character.</p>
-              <p>Start by choosing a character above. The currently chosen character will be used for actions in this wizard as you press relevant buttons.</p>
+              <p>Let's get authentication tokens for everyone for a smooth demo first:</p>
+              <button id="auth-button">Get authentication tokens</button>
+
+              <p>Now start by choosing a character above. The currently chosen character will be used for actions in this wizard as you press relevant buttons.</p>
               <p>The output field at the bottom will indicate what's happening when you press each button.</p>
 
               <p>For the demo to be consistent across runs, we need to begin by resetting the workers' pods to initial state.</p>
