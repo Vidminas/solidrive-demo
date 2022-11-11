@@ -55,6 +55,8 @@ export async function deleteOrIgnoreContainer(containerUrl, authFetch) {
   if (getThingAll(container) === []) {
     await deleteContainer(containerUrl, { fetch: authFetch });
   } else {
-    throw new Error("Cannot delete Solidrive container - it is not empty. Recursive delete not implemented yet...");
+    throw new Error(
+      "Cannot delete Solidrive container - it is not empty. Recursive delete not implemented yet..."
+    );
   }
 }

@@ -153,7 +153,7 @@ document.addEventListener("DOMContentLoaded", function () {
   resetButton.onclick = resetPoints;
 
   const loginButton = document.getElementById("loginButton");
-  loginButton.onclick = function() {
+  loginButton.onclick = function () {
     loginToIDP();
   };
 

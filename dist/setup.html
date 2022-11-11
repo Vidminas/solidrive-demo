@@ -60,16 +60,24 @@
         can only be obtained once.
       </p>
       <p>
-        For this demo, the latest token for each user is stored in the root pod with public access
-        for easy retrieval (UNSAFE! DO NOT TRY THIS AT HOME).
+        For this demo, the latest token for each user is stored in the root pod
+        with public access for easy retrieval (UNSAFE! DO NOT TRY THIS AT HOME).
       </p>
       <p>Output:</p>
       <textarea id="token-output" readonly rows="10" cols="100"></textarea>
     </section>
 
     <section class="panel">
-      <p>Finally, once you have tokens so everyone can log in, the Solidrive account also needs cryptographic keys so they can sign all the data they write.</p>
-      <p>You can check the existing keys (if any), or rotate the keychain, which will generate a new set of keys.</p>
+      <p>
+        Finally, once you have tokens so everyone can log in, the Solidrive
+        account also needs cryptographic keys so they can sign all the data they
+        write.
+      </p>
+      <p>
+        You can check the existing keys (if any), or rotate the keychain, which
+        will generate a new set of keys.
+      </p>
+      <p>The latest keys are stored in the Solidrive pod</p>
 
       <button id="check-keychain-button">Check Keychain</button>
       <button id="rotate-keychain-button">Rotate Keychain</button>

@@ -230,7 +230,9 @@ async function checkKeychain() {
   }
 
   try {
-    const keysDataset = await getSolidDataset(SOLIDRIVE_KEYS_URL, { fetch: solidriveAuthFetch });
+    const keysDataset = await getSolidDataset(SOLIDRIVE_KEYS_URL, {
+      fetch: solidriveAuthFetch,
+    });
     const keysThing = getThingAll(keysDataset)[0];
     const keys = getStringNoLocale(keysThing, XSD.string);
     addToTextArea("#keychain-output", `Found Solidrive keys: ${keys}`);
@@ -256,12 +258,19 @@ async function rotateKeychain() {
     const keys = await generateKeyPair("RS512", { extractable: true });
     const publicKey = await exportJWK(keys.publicKey);
     const privateKey = await exportJWK(keys.privateKey);
-    let keysDataset = await getOrCreateSolidDataset(SOLIDRIVE_KEYS_URL, solidriveAuthFetch);
+    let keysDataset = await getOrCreateSolidDataset(
+      SOLIDRIVE_KEYS_URL,
+      solidriveAuthFetch
+    );
     let keysThing = getOrCreateThing(
       keysDataset,
       `${SOLIDRIVE_KEYS_URL}#latest`
     );
-    keysThing = setStringNoLocale(keysThing, XSD.string, JSON.stringify({ publicKey, privateKey }));
+    keysThing = setStringNoLocale(
+      keysThing,
+      XSD.string,
+      JSON.stringify({ publicKey, privateKey })
+    );
     keysDataset = setThing(keysDataset, keysThing);
     await saveSolidDatasetAt(SOLIDRIVE_KEYS_URL, keysDataset, {
       fetch: solidriveAuthFetch,

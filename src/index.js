@@ -267,16 +267,19 @@ async function revokeSolidriveAccess(event) {
 // Should refactor so these global variables aren't needed, but I'm cutting corners for now
 const activeTripRequests = {};
 const money = {
-  "alice": 0,
-  "bob": 0,
-  "eve": 0,
+  alice: 0,
+  bob: 0,
+  eve: 0,
 };
 const fuelPerKmCost = 2;
 
 function showTripRequest(event) {
   const person = event.data.selectedPerson;
   if (activeTripRequests[person]) {
-    addToTextArea("#step-3-output", `${person} already has an oustanding trip request!`);
+    addToTextArea(
+      "#step-3-output",
+      `${person} already has an oustanding trip request!`
+    );
     return;
   }
   activeTripRequests[person] = generateTripRequest();
@@ -286,7 +289,9 @@ function showTripRequest(event) {
 }
 
 async function getSolidriveSigningKey(solidriveFetch) {
-  const keysDataset = await getSolidDataset(SOLIDRIVE_KEYS_URL, { fetch: solidriveFetch });
+  const keysDataset = await getSolidDataset(SOLIDRIVE_KEYS_URL, {
+    fetch: solidriveFetch,
+  });
   const keysThing = getThingAll(keysDataset)[0];
   const keys = getStringNoLocale(keysThing, XSD.string);
   const { publicKey, privateKey } = JSON.parse(keys);
@@ -296,37 +301,51 @@ async function getSolidriveSigningKey(solidriveFetch) {
 async function saveTripData(tripRequest, review, webId, solidriveFetch) {
   try {
     let dataset = createSolidDataset();
-    let tripThing = createThing({ name: `trip-${tripRequest.id}`});
-    tripThing = setStringNoLocale(tripThing, DCTERMS.identifier, tripRequest.id);
+    let tripThing = createThing({ name: `trip-${tripRequest.id}` });
+    tripThing = setStringNoLocale(
+      tripThing,
+      DCTERMS.identifier,
+      tripRequest.id
+    );
     // Could make a vocabulary artifact to get type checking instead of having to have this IRI here
     // by following https://solidproject.org/developers/vocabularies/code/quickstart
     // The Financial Business Ontology has a data explorer here: https://spec.edmcouncil.org/fibo/ontology/FND/Accounting/CurrencyAmount/Price
-    tripThing = setDecimal(tripThing, "https://spec.edmcouncil.org/fibo/ontology/FND/Accounting/CurrencyAmount/Price", tripRequest.payment);
+    tripThing = setDecimal(
+      tripThing,
+      "https://spec.edmcouncil.org/fibo/ontology/FND/Accounting/CurrencyAmount/Price",
+      tripRequest.payment
+    );
     if (review) {
       tripThing = setStringNoLocale(tripThing, SKOS.note, review);
     }
-    tripThing = setDecimal(tripThing, "http://ldf.fi/schema/tour-rdf/distance", tripRequest.distance);
+    tripThing = setDecimal(
+      tripThing,
+      "http://ldf.fi/schema/tour-rdf/distance",
+      tripRequest.distance
+    );
 
     const solidriveKey = await getSolidriveSigningKey(solidriveFetch);
-    console.log(solidriveKey);
-    const jwe = await new SignJWT({ 
+    const jwe = await new SignJWT({
       iss: WEBID_SOLIDRIVE, //issuer
       sub: webId, //subject
       iat: new Date().toISOString(), //issued at time
     })
-    .setProtectedHeader({
-      alg: "RS512",
-    })
-    .sign(solidriveKey);
+      .setProtectedHeader({
+        alg: "RS512",
+      })
+      .sign(solidriveKey);
     tripThing = setStringNoLocale(tripThing, CRED.verifiableCredential, jwe);
-    
+
     dataset = setThing(dataset, tripThing);
 
     const solidriveDataUrl = webId.replace(
       "profile/card#me",
       SOLIDRIVE_CONTAINER_URL
     );
-    await saveSolidDatasetInContainer(solidriveDataUrl, dataset, { fetch: solidriveFetch, slugSuggestion: `trip-${tripRequest.id}` });
+    await saveSolidDatasetInContainer(solidriveDataUrl, dataset, {
+      fetch: solidriveFetch,
+      slugSuggestion: `trip-${tripRequest.id}`,
+    });
   } catch (err) {
     addToTextArea("#step-3-output", `Error saving trip data: ${err}`);
   }
@@ -339,17 +358,26 @@ async function acceptTripRequest(event) {
 
   const tripRequest = activeTripRequests[person];
   if (!tripRequest) {
-    addToTextArea("#step-3-output", `${person} has no outstanding trip requests!`);
+    addToTextArea(
+      "#step-3-output",
+      `${person} has no outstanding trip requests!`
+    );
     return;
   }
 
   addToTextArea("#step-3-output", "Accepted trip request");
 
   money[person] += tripRequest.payment;
-  addToTextArea("#step-3-output", `${person} earned $${tripRequest.payment}. They now have: $${money[person]}`);
+  addToTextArea(
+    "#step-3-output",
+    `${person} earned $${tripRequest.payment}. They now have: $${money[person]}`
+  );
   const fuelCost = tripRequest.distance * fuelPerKmCost;
   money[person] -= fuelCost;
-  addToTextArea("#step-3-output", `But the trip took them ${tripRequest.distance}km and they had to pay $${fuelCost} for fuel.`);
+  addToTextArea(
+    "#step-3-output",
+    `But the trip took them ${tripRequest.distance}km and they had to pay $${fuelCost} for fuel.`
+  );
   const review = generatePassengerReview();
   if (review) {
     addToTextArea("#step-3-output", `The passenger left a review: ${review}`);
@@ -362,7 +390,10 @@ async function acceptTripRequest(event) {
 function rejectTripRequest(event) {
   const person = event.data.selectedPerson;
   if (!activeTripRequests[person]) {
-    addToTextArea("#step-3-output", `${person} has no outstanding trip requests!`);
+    addToTextArea(
+      "#step-3-output",
+      `${person} has no outstanding trip requests!`
+    );
     return;
   }
   activeTripRequests[person] = null;
@@ -395,7 +426,9 @@ $(async function () {
       switch (newValues[0]) {
         case "alice":
           $("#login-details").text(LOGIN_DETAILS_ALICE);
-          $("#driver-webid").html(`<a href="${WEBID_ALICE}">${WEBID_ALICE}</a>`);
+          $("#driver-webid").html(
+            `<a href="${WEBID_ALICE}">${WEBID_ALICE}</a>`
+          );
           selectedPerson = "alice";
           break;
         case "bob":
@@ -413,7 +446,7 @@ $(async function () {
   });
 
   const authMap = {};
-  $("#auth-button").on("click", async function() {
+  $("#auth-button").on("click", async function () {
     const tokenMap = await getStoredTokens();
     await makeAccessTokens(tokenMap, authMap);
   });
@@ -444,6 +477,10 @@ $(async function () {
   );
 
   $("#wait-trip-request").on("click", { selectedPerson }, showTripRequest);
-  $("#accept-trip-request").on("click", { authMap, selectedPerson }, acceptTripRequest);
+  $("#accept-trip-request").on(
+    "click",
+    { authMap, selectedPerson },
+    acceptTripRequest
+  );
   $("#reject-trip-request").on("click", { selectedPerson }, rejectTripRequest);
 });
